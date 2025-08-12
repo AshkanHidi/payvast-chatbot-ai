@@ -1,3 +1,4 @@
+
 export enum MessageAuthor {
   USER = 'user',
   BOT = 'bot',
@@ -18,8 +19,6 @@ export interface KnowledgeEntry {
   hasVideo: boolean;
   hasDocument: boolean;
   hasImage: boolean;
-  likes: number;
-  dislikes: number;
   hits: number;
   videoUrl?: string;
   documentUrl?: string;

@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage, MessageAuthor, KnowledgeEntry } from '../types';
-import { BotIcon, SendIcon, UserIcon, VideoPlayIcon, TelegramIcon, ThumbsUpIcon, ThumbsDownIcon, DocumentIcon, ImageIcon } from './icons';
+import { BotIcon, SendIcon, UserIcon, VideoPlayIcon, TelegramIcon, DocumentIcon, ImageIcon } from './icons';
 
 const playResponseSound = () => {
   const audio = new Audio('/bot-response.mp3');
@@ -15,28 +15,8 @@ interface ChatBubbleProps {
 
 const ChatBubble: React.FC<ChatBubbleProps> = ({ message }) => {
   const isUser = message.author === MessageAuthor.USER;
-  const [feedbackGiven, setFeedbackGiven] = useState(false);
   
-  const handleFeedback = async (type: 'like' | 'dislike') => {
-      if (feedbackGiven || !message.sources || message.sources.length === 0) return;
-      
-      setFeedbackGiven(true);
-      
-      const sourceIds = message.sources.map(s => s.id);
-      const feedbackPromises = sourceIds.map(sourceId =>
-        fetch(`/api/knowledge-base/${sourceId}/${type}`, { method: 'POST' })
-      );
-
-      try {
-          await Promise.all(feedbackPromises);
-      } catch (error) {
-          console.error(`Failed to submit feedback`, error);
-          setFeedbackGiven(false); // Allow retry if it fails
-      }
-  };
-
   const hasSources = message.sources && message.sources.length > 0;
-  const hasFeedback = !isUser && hasSources;
   
   // Collect all unique links from all sources
   const attachmentLinks = hasSources ? message.sources!.reduce((acc, source) => {
@@ -61,31 +41,9 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message }) => {
         }`}>
         <p className="whitespace-pre-wrap text-justify text-sm p-2.5">{message.text}</p>
         
-        {(hasFooter || hasFeedback) && <div className="border-t border-slate-600/50 mt-2"></div>}
+        {hasFooter && <div className="border-t border-slate-600/50 mt-2"></div>}
         
         <div className="px-2.5 py-2 space-y-2">
-            {hasFeedback && (
-                <div className="flex items-center justify-end gap-3">
-                    <span className="text-xs text-slate-400">آیا این پاسخ مفید بود؟</span>
-                    <button 
-                      onClick={() => handleFeedback('like')} 
-                      disabled={feedbackGiven} 
-                      className="p-1 rounded-full text-slate-400 hover:text-green-400 hover:bg-slate-600/50 disabled:text-green-500 disabled:cursor-not-allowed transition-colors"
-                      aria-label="پاسخ مفید بود"
-                    >
-                        <ThumbsUpIcon className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => handleFeedback('dislike')} 
-                      disabled={feedbackGiven} 
-                      className="p-1 rounded-full text-slate-400 hover:text-red-400 hover:bg-slate-600/50 disabled:text-red-500 disabled:cursor-not-allowed transition-colors"
-                      aria-label="پاسخ مفید نبود"
-                    >
-                        <ThumbsDownIcon className="w-4 h-4" />
-                    </button>
-                </div>
-            )}
-
             {hasFooter && (
                 <div className="flex justify-end items-center gap-2 flex-wrap">
                     {hasAttachments && [...attachmentLinks.videos].map(url => (

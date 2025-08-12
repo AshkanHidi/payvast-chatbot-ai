@@ -42,7 +42,7 @@ const ai = new GoogleGenAI({ apiKey: apiKey || 'INVALID_KEY' });
  * Finds the most relevant knowledge base entries using Trigram similarity.
  * It no longer uses a strict threshold, instead always returning the top candidates
  * to let the LLM make the final decision on relevance.
- * Ranks results by relevance, then by net likes (likes - dislikes), and finally by hits.
+ * Ranks results by relevance and then by hits.
  */
 const findRelevantContext = async (userQuestion: string, maxResults = 3): Promise<KnowledgeEntry[]> => {
     if (!userQuestion || !userQuestion.trim()) return [];
@@ -57,7 +57,6 @@ const findRelevantContext = async (userQuestion: string, maxResults = 3): Promis
             FROM knowledge_base
             ORDER BY
                 relevance DESC,
-                (likes - dislikes) DESC,
                 hits DESC
             LIMIT ${maxResults};
         `;
@@ -129,7 +128,7 @@ Always answer in Persian. Be concise and clear.`;
 
 app.get('/api/knowledge-base', async (req, res) => {
     try {
-        const { rows } = await sql<KnowledgeEntry>`SELECT * FROM knowledge_base ORDER BY (likes - dislikes) DESC, hits DESC;`;
+        const { rows } = await sql<KnowledgeEntry>`SELECT * FROM knowledge_base ORDER BY hits DESC;`;
         res.json(rows);
     } catch (error) {
         console.error('Failed to fetch knowledge base:', error);
@@ -215,27 +214,6 @@ app.delete('/api/knowledge-base/:id', async (req, res) => {
         res.status(500).json({ error: 'Failed to delete entry.' });
     }
 });
-
-app.post('/api/knowledge-base/:id/like', async (req, res) => {
-    const { id } = req.params;
-    try {
-        await sql`UPDATE knowledge_base SET likes = likes + 1 WHERE id = ${id}`;
-        res.status(200).json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to process like.' });
-    }
-});
-
-app.post('/api/knowledge-base/:id/dislike', async (req, res) => {
-    const { id } = req.params;
-     try {
-        await sql`UPDATE knowledge_base SET dislikes = dislikes + 1 WHERE id = ${id}`;
-        res.status(200).json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to process dislike.' });
-    }
-});
-
 
 // This export is required for Vercel to treat this file as a serverless function
 export default app;

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { KnowledgeEntry, KnowledgeEntryType } from '../types';
 import { 
-    PlusIcon, EditIcon, TrashIcon, XIcon, ThumbsUpIcon, ThumbsDownIcon, EyeIcon, 
+    PlusIcon, EditIcon, TrashIcon, XIcon, EyeIcon, 
     VideoPlayIcon, DocumentIcon, ImageIcon 
 } from './icons';
 
@@ -262,8 +262,6 @@ export const KnowledgeBaseManager: React.FC = () => {
                                         </div>
                                     </div>
                                      <div className="flex items-center gap-4">
-                                        <Stat icon={<ThumbsUpIcon className="w-4 h-4 text-green-500"/>} value={entry.likes} label="مفید"/>
-                                        <Stat icon={<ThumbsDownIcon className="w-4 h-4 text-red-500"/>} value={entry.dislikes} label="غیرمفید"/>
                                         <Stat icon={<EyeIcon className="w-4 h-4 text-sky-400"/>} value={entry.hits} label="بازدید"/>
                                     </div>
                                 </div>

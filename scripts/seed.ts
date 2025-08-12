@@ -17,8 +17,6 @@ interface KnowledgeEntrySeed {
   hasVideo: boolean;
   hasDocument: boolean;
   hasImage: boolean;
-  likes: number;
-  dislikes: number;
   hits: number;
   videoUrl?: string;
   documentUrl?: string;
@@ -55,8 +53,6 @@ async function seedDatabase() {
         "hasVideo" BOOLEAN DEFAULT FALSE,
         "hasDocument" BOOLEAN DEFAULT FALSE,
         "hasImage" BOOLEAN DEFAULT FALSE,
-        likes INT DEFAULT 0,
-        dislikes INT DEFAULT 0,
         hits INT DEFAULT 0,
         "videoUrl" TEXT,
         "documentUrl" TEXT,
@@ -80,8 +76,8 @@ async function seedDatabase() {
     for (const entry of entries) {
       await client.query(
         `
-        INSERT INTO knowledge_base (id, question, answer, type, system, "hasVideo", "hasDocument", "hasImage", likes, dislikes, hits, "videoUrl", "documentUrl", "imageUrl")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        INSERT INTO knowledge_base (id, question, answer, type, system, "hasVideo", "hasDocument", "hasImage", hits, "videoUrl", "documentUrl", "imageUrl")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         ON CONFLICT (id) DO NOTHING;
         `,
         [
@@ -93,8 +89,6 @@ async function seedDatabase() {
           entry.hasVideo || false,
           entry.hasDocument || false,
           entry.hasImage || false,
-          entry.likes || 0,
-          entry.dislikes || 0,
           entry.hits || 0,
           entry.videoUrl || null,
           entry.documentUrl || null,
