@@ -1,4 +1,5 @@
-import express, { RequestHandler } from 'express';
+
+import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
@@ -24,8 +25,8 @@ if (proxy) {
 const app = express();
 
 // Middlewares
-app.use(cors() as RequestHandler);
-app.use(express.json());
+app.use(cors() as any);
+app.use(express.json() as any);
 
 // --- Globals & Initialization ---
 const apiKey = process.env.API_KEY;
@@ -38,19 +39,22 @@ const ai = new GoogleGenAI({ apiKey: apiKey || 'INVALID_KEY' });
 // --- Knowledge Base Logic with PostgreSQL ---
 
 /**
- * Finds relevant knowledge base entries using Trigram similarity for a smarter, more flexible search.
+ * Finds the most relevant knowledge base entries using Trigram similarity.
+ * It no longer uses a strict threshold, instead always returning the top candidates
+ * to let the LLM make the final decision on relevance.
  * Ranks results by relevance, then by net likes (likes - dislikes), and finally by hits.
  */
 const findRelevantContext = async (userQuestion: string, maxResults = 3): Promise<KnowledgeEntry[]> => {
     if (!userQuestion || !userQuestion.trim()) return [];
 
     try {
+        // The WHERE clause has been removed to make the search more flexible.
+        // We now always fetch the top N most similar results and let the LLM decide if they're useful.
         const { rows } = await sql<KnowledgeEntry>`
             SELECT 
                 *,
                 similarity(question, ${userQuestion}) as relevance
             FROM knowledge_base
-            WHERE similarity(question, ${userQuestion}) > 0.1
             ORDER BY
                 relevance DESC,
                 (likes - dislikes) DESC,
@@ -135,14 +139,20 @@ app.get('/api/knowledge-base', async (req, res) => {
 
 app.post('/api/knowledge-base', async (req, res) => {
     const { question, answer, type, system, hasVideo, hasDocument, hasImage, videoUrl, documentUrl, imageUrl } = req.body;
-    if (!question || !answer || !type || !system) {
+    
+    // Trim input data for consistency
+    const trimmedQuestion = question?.trim();
+    const trimmedAnswer = answer?.trim();
+    const trimmedSystem = system?.trim();
+
+    if (!trimmedQuestion || !trimmedAnswer || !type || !trimmedSystem) {
         return res.status(400).json({ error: 'Required fields are missing.' });
     }
     try {
         const newId = `kb-${Date.now()}`;
         const result = await sql`
             INSERT INTO knowledge_base (id, question, answer, type, system, "hasVideo", "hasDocument", "hasImage", "videoUrl", "documentUrl", "imageUrl")
-            VALUES (${newId}, ${question}, ${answer}, ${type}, ${system}, ${!!hasVideo}, ${!!hasDocument}, ${!!hasImage}, ${videoUrl || null}, ${documentUrl || null}, ${imageUrl || null})
+            VALUES (${newId}, ${trimmedQuestion}, ${trimmedAnswer}, ${type}, ${trimmedSystem}, ${!!hasVideo}, ${!!hasDocument}, ${!!hasImage}, ${videoUrl || null}, ${documentUrl || null}, ${imageUrl || null})
             RETURNING *;
         `;
         res.status(201).json(result.rows[0]);
@@ -156,7 +166,12 @@ app.put('/api/knowledge-base/:id', async (req, res) => {
     const { id } = req.params;
     const { question, answer, type, system, hasVideo, hasDocument, hasImage, videoUrl, documentUrl, imageUrl } = req.body;
     
-    if (!question || !answer || !type || !system) {
+    // Trim input data for consistency
+    const trimmedQuestion = question?.trim();
+    const trimmedAnswer = answer?.trim();
+    const trimmedSystem = system?.trim();
+
+    if (!trimmedQuestion || !trimmedAnswer || !type || !trimmedSystem) {
         return res.status(400).json({ error: 'Required fields are missing.' });
     }
 
@@ -164,10 +179,10 @@ app.put('/api/knowledge-base/:id', async (req, res) => {
         const result = await sql`
             UPDATE knowledge_base
             SET 
-                question = ${question}, 
-                answer = ${answer}, 
+                question = ${trimmedQuestion}, 
+                answer = ${trimmedAnswer}, 
                 type = ${type}, 
-                system = ${system}, 
+                system = ${trimmedSystem}, 
                 "hasVideo" = ${!!hasVideo}, 
                 "hasDocument" = ${!!hasDocument}, 
                 "hasImage" = ${!!hasImage}, 
