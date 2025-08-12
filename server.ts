@@ -1,5 +1,5 @@
 
-import express from 'express';
+import express, { json } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
@@ -26,7 +26,7 @@ const app = express();
 
 // Middlewares
 app.use(cors());
-app.use(express.json());
+app.use(json());
 
 // --- Globals & Initialization ---
 const apiKey = process.env.API_KEY;
@@ -132,9 +132,10 @@ app.post('/api/knowledge-base', async (req, res) => {
         return res.status(400).json({ error: 'Required fields are missing.' });
     }
     try {
+        const newId = `kb-${Date.now()}`;
         const result = await sql`
-            INSERT INTO knowledge_base (question, answer, type, system, "hasVideo", "hasDocument", "hasImage", "videoUrl", "documentUrl", "imageUrl")
-            VALUES (${question}, ${answer}, ${type}, ${system}, ${!!hasVideo}, ${!!hasDocument}, ${!!hasImage}, ${videoUrl || null}, ${documentUrl || null}, ${imageUrl || null})
+            INSERT INTO knowledge_base (id, question, answer, type, system, "hasVideo", "hasDocument", "hasImage", "videoUrl", "documentUrl", "imageUrl")
+            VALUES (${newId}, ${question}, ${answer}, ${type}, ${system}, ${!!hasVideo}, ${!!hasDocument}, ${!!hasImage}, ${videoUrl || null}, ${documentUrl || null}, ${imageUrl || null})
             RETURNING *;
         `;
         res.status(201).json(result.rows[0]);
