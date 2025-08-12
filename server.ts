@@ -22,6 +22,25 @@ if (proxy) {
     setGlobalDispatcher(dispatcher);
 }
 
+/**
+ * Normalizes Persian text for consistent searching and storage.
+ * - Converts Arabic 'ي' and 'ك' to their Persian equivalents.
+ * - Handles special characters like ZWNJ.
+ * - Applies NFC Unicode normalization.
+ * - Trims and collapses whitespace.
+ */
+const normalizePersian = (text: string | null | undefined): string => {
+    if (!text) return '';
+    return text
+        .normalize('NFC')
+        .replace(/ي/g, 'ی') // Arabic Yeh to Persian Yeh
+        .replace(/ك/g, 'ک') // Arabic Kaf to Persian Kaf
+        .replace(/‌/g, ' ') // Replace Zero-width non-joiner with a space
+        .replace(/\s+/g, ' ') // Collapse multiple whitespace chars into a single space
+        .trim();
+};
+
+
 const app = express();
 
 // Middlewares
@@ -39,17 +58,18 @@ const ai = new GoogleGenAI({ apiKey: apiKey || 'INVALID_KEY' });
 // --- Knowledge Base Logic with PostgreSQL ---
 
 /**
- * Finds the most relevant knowledge base entries using the trigram distance operator '<->'.
- * This is a highly reliable and efficient method for finding the "nearest neighbors" to a given string,
- * leveraging the GIN index for optimal performance. It orders by distance (lower is better/more similar).
+ * Finds relevant knowledge base entries using trigram similarity.
+ * It filters entries below a certain similarity threshold to ensure relevance
+ * and then orders them by distance (most similar first).
  */
-const findRelevantContext = async (userQuestion: string, maxResults = 3): Promise<KnowledgeEntry[]> => {
+const findRelevantContext = async (userQuestion: string, maxResults = 3, similarityThreshold = 0.25): Promise<KnowledgeEntry[]> => {
     if (!userQuestion || !userQuestion.trim()) return [];
 
     try {
         const { rows } = await sql<KnowledgeEntry>`
             SELECT *
             FROM knowledge_base
+            WHERE similarity(question, ${userQuestion}) > ${similarityThreshold}
             ORDER BY question <-> ${userQuestion}
             LIMIT ${maxResults};
         `;
@@ -74,7 +94,8 @@ app.post('/api/chat', async (req, res) => {
     }
 
     try {
-        const contextEntries = await findRelevantContext(question);
+        const normalizedQuestion = normalizePersian(question);
+        const contextEntries = await findRelevantContext(normalizedQuestion);
         
         if (contextEntries.length > 0) {
             const entryIds = contextEntries.map(e => e.id);
@@ -95,7 +116,7 @@ Answer the user's question based *only* on the provided context.
 If the context is empty or does not contain the answer, state that you don't have enough information and suggest they ask in a different way or contact support.
 Always answer in Persian. Be concise and clear.`;
 
-        const prompt = `Context:\n${contextText}\n\nUser Question: ${question}`;
+        const prompt = `Context:\n${contextText}\n\nUser Question: ${normalizedQuestion}`;
         
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
@@ -132,19 +153,19 @@ app.get('/api/knowledge-base', async (req, res) => {
 app.post('/api/knowledge-base', async (req, res) => {
     const { question, answer, type, system, hasVideo, hasDocument, hasImage, videoUrl, documentUrl, imageUrl } = req.body;
     
-    // Trim input data for consistency
-    const trimmedQuestion = question?.trim();
-    const trimmedAnswer = answer?.trim();
-    const trimmedSystem = system?.trim();
+    // Normalize text data for consistency
+    const normalizedQuestion = normalizePersian(question);
+    const normalizedAnswer = normalizePersian(answer);
+    const normalizedSystem = normalizePersian(system);
 
-    if (!trimmedQuestion || !trimmedAnswer || !type || !trimmedSystem) {
+    if (!normalizedQuestion || !normalizedAnswer || !type || !normalizedSystem) {
         return res.status(400).json({ error: 'Required fields are missing.' });
     }
     try {
         const newId = `kb-${Date.now()}`;
         const result = await sql`
             INSERT INTO knowledge_base (id, question, answer, type, system, "hasVideo", "hasDocument", "hasImage", "videoUrl", "documentUrl", "imageUrl")
-            VALUES (${newId}, ${trimmedQuestion}, ${trimmedAnswer}, ${type}, ${trimmedSystem}, ${!!hasVideo}, ${!!hasDocument}, ${!!hasImage}, ${videoUrl || null}, ${documentUrl || null}, ${imageUrl || null})
+            VALUES (${newId}, ${normalizedQuestion}, ${normalizedAnswer}, ${type}, ${normalizedSystem}, ${!!hasVideo}, ${!!hasDocument}, ${!!hasImage}, ${videoUrl || null}, ${documentUrl || null}, ${imageUrl || null})
             RETURNING *;
         `;
         res.status(201).json(result.rows[0]);
@@ -158,12 +179,12 @@ app.put('/api/knowledge-base/:id', async (req, res) => {
     const { id } = req.params;
     const { question, answer, type, system, hasVideo, hasDocument, hasImage, videoUrl, documentUrl, imageUrl } = req.body;
     
-    // Trim input data for consistency
-    const trimmedQuestion = question?.trim();
-    const trimmedAnswer = answer?.trim();
-    const trimmedSystem = system?.trim();
+    // Normalize text data for consistency
+    const normalizedQuestion = normalizePersian(question);
+    const normalizedAnswer = normalizePersian(answer);
+    const normalizedSystem = normalizePersian(system);
 
-    if (!trimmedQuestion || !trimmedAnswer || !type || !trimmedSystem) {
+    if (!normalizedQuestion || !normalizedAnswer || !type || !normalizedSystem) {
         return res.status(400).json({ error: 'Required fields are missing.' });
     }
 
@@ -171,10 +192,10 @@ app.put('/api/knowledge-base/:id', async (req, res) => {
         const result = await sql`
             UPDATE knowledge_base
             SET 
-                question = ${trimmedQuestion}, 
-                answer = ${trimmedAnswer}, 
+                question = ${normalizedQuestion}, 
+                answer = ${normalizedAnswer}, 
                 type = ${type}, 
-                system = ${trimmedSystem}, 
+                system = ${normalizedSystem}, 
                 "hasVideo" = ${!!hasVideo}, 
                 "hasDocument" = ${!!hasDocument}, 
                 "hasImage" = ${!!hasImage}, 
