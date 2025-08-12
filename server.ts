@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { RequestHandler } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
@@ -24,7 +24,8 @@ if (proxy) {
 const app = express();
 
 // Middlewares
-app.use(cors(), express.json());
+app.use(cors() as RequestHandler);
+app.use(express.json());
 
 // --- Globals & Initialization ---
 const apiKey = process.env.API_KEY;
@@ -36,30 +37,27 @@ const ai = new GoogleGenAI({ apiKey: apiKey || 'INVALID_KEY' });
 
 // --- Knowledge Base Logic with PostgreSQL ---
 
+/**
+ * Finds relevant knowledge base entries using Trigram similarity for a smarter, more flexible search.
+ * Ranks results by relevance, then by net likes (likes - dislikes), and finally by hits.
+ */
 const findRelevantContext = async (userQuestion: string, maxResults = 3): Promise<KnowledgeEntry[]> => {
     if (!userQuestion || !userQuestion.trim()) return [];
 
     try {
-        // IMPROVEMENT: Use `to_tsquery` with OR operators for better recall.
-        // This converts a question like "مدیر آموزش کیست" into a query "مدیر | آموزش | کیست",
-        // finding documents that contain ANY of these words and ranking them.
-        const queryTerms = userQuestion
-            .trim()
-            .replace(/[?؟.,!]/g, '') // Remove common punctuation
-            .split(/\s+/)           // Split by whitespace
-            .filter(term => term.length > 1) // Filter out very short/irrelevant terms
-            .join(' | ');
-
-        if (!queryTerms) return []; // Return empty if the question only contained noise words
-
-        const { rows } = await sql`
-            SELECT *, ts_rank(document_vector, to_tsquery('simple', ${queryTerms})) as relevance
+        const { rows } = await sql<KnowledgeEntry>`
+            SELECT 
+                *,
+                similarity(question, ${userQuestion}) as relevance
             FROM knowledge_base
-            WHERE document_vector @@ to_tsquery('simple', ${queryTerms})
-            ORDER BY relevance DESC
+            WHERE similarity(question, ${userQuestion}) > 0.1
+            ORDER BY
+                relevance DESC,
+                (likes - dislikes) DESC,
+                hits DESC
             LIMIT ${maxResults};
         `;
-        return rows as KnowledgeEntry[];
+        return rows;
     } catch (error) {
         console.error('Error finding relevant context from DB:', error);
         return [];
@@ -127,7 +125,7 @@ Always answer in Persian. Be concise and clear.`;
 
 app.get('/api/knowledge-base', async (req, res) => {
     try {
-        const { rows } = await sql<KnowledgeEntry>`SELECT * FROM knowledge_base ORDER BY hits DESC;`;
+        const { rows } = await sql<KnowledgeEntry>`SELECT * FROM knowledge_base ORDER BY (likes - dislikes) DESC, hits DESC;`;
         res.json(rows);
     } catch (error) {
         console.error('Failed to fetch knowledge base:', error);
