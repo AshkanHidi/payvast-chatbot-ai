@@ -1,0 +1,58 @@
+
+[
+  {
+    "id": "kb-3",
+    "question": "آیا نرم افزار شما تحت وب است؟",
+    "answer": "بله، تمامی محصولات جدید ما تحت وب بوده و از طریق مرورگر قابل دسترسی هستند.",
+    "type": "عمومی",
+    "system": "کلیه سیستم‌ها",
+    "hasVideo": false,
+    "hasDocument": false,
+    "hasImage": false,
+    "likes": 5,
+    "dislikes": 0,
+    "hits": 12
+  },
+  {
+    "id": "kb-4",
+    "question": "چطور یک گزارش جدید بسازم؟",
+    "answer": "برای ساخت گزارش جدید، به منوی گزارشات بروید و گزینه گزارش‌ساز را انتخاب کنید. برای راهنمایی تصویری می‌توانید ویدیوی آموزشی ما را مشاهده کنید.",
+    "type": "پشتیبانی",
+    "system": "گزارش‌ساز",
+    "hasVideo": true,
+    "hasDocument": false,
+    "hasImage": false,
+    "likes": 15,
+    "dislikes": 1,
+    "hits": 30,
+    "videoUrl": "https://www.aparat.com/v/example"
+  },
+  {
+    "id": "kb-2",
+    "question": "رمز عبور خود را فراموش کرده ام، چه کار کنم؟",
+    "answer": "در صفحه ورود، روی لینک «فراموشی رمز عبور» کلیک کرده و ایمیل خود را وارد کنید تا لینک بازیابی برایتان ارسال شود.",
+    "type": "پشتیبانی",
+    "system": "پورتال",
+    "hasVideo": false,
+    "hasDocument": true,
+    "hasImage": false,
+    "likes": 8,
+    "dislikes": 0,
+    "hits": 22,
+    "documentUrl": "https://example.com/password-reset-guide.pdf"
+  },
+  {
+    "id": "kb-1",
+    "question": "مدیر آموزش پیوست کیست؟",
+    "answer": "در حال حاضر آقای اشکان هیدی مدیر آموزش گروه نرم افزاری پیوست هستند. اطلاعات کامل تر در مورد ایشان را می توانید در وب سایت گروه نرم افزاری پیوست رویت فرمایید.",
+    "type": "عمومی",
+    "system": "سازمانی",
+    "hasVideo": false,
+    "hasDocument": false,
+    "hasImage": true,
+    "likes": 2,
+    "dislikes": 0,
+    "hits": 5,
+    "imageUrl": "https://example.com/ashkan-heidi.jpg"
+  }
+]
