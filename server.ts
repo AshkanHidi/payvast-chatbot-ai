@@ -1,4 +1,3 @@
-
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -25,8 +24,7 @@ if (proxy) {
 const app = express();
 
 // Middlewares
-app.use(cors());
-app.use(express.json() as express.RequestHandler);
+app.use(cors(), express.json());
 
 // --- Globals & Initialization ---
 const apiKey = process.env.API_KEY;
@@ -42,11 +40,22 @@ const findRelevantContext = async (userQuestion: string, maxResults = 3): Promis
     if (!userQuestion || !userQuestion.trim()) return [];
 
     try {
-        // Use plainto_tsquery for safer handling of raw user input
+        // IMPROVEMENT: Use `to_tsquery` with OR operators for better recall.
+        // This converts a question like "مدیر آموزش کیست" into a query "مدیر | آموزش | کیست",
+        // finding documents that contain ANY of these words and ranking them.
+        const queryTerms = userQuestion
+            .trim()
+            .replace(/[?؟.,!]/g, '') // Remove common punctuation
+            .split(/\s+/)           // Split by whitespace
+            .filter(term => term.length > 1) // Filter out very short/irrelevant terms
+            .join(' | ');
+
+        if (!queryTerms) return []; // Return empty if the question only contained noise words
+
         const { rows } = await sql`
-            SELECT *, ts_rank(document_vector, plainto_tsquery('simple', ${userQuestion})) as relevance
+            SELECT *, ts_rank(document_vector, to_tsquery('simple', ${queryTerms})) as relevance
             FROM knowledge_base
-            WHERE document_vector @@ plainto_tsquery('simple', ${userQuestion})
+            WHERE document_vector @@ to_tsquery('simple', ${queryTerms})
             ORDER BY relevance DESC
             LIMIT ${maxResults};
         `;
