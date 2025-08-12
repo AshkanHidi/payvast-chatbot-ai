@@ -96,45 +96,34 @@ app.post('/api/chat', async (req, res) => {
     try {
         const normalizedQuestion = normalizePersian(question);
         const contextEntries = await findRelevantContext(normalizedQuestion);
-        
+
         if (contextEntries.length > 0) {
+            // DEBUG: Bypass Gemini and return direct DB results.
+            const combinedAnswer = contextEntries
+                .map(e => e.answer)
+                .join('\n\n---\n\n');
+
+            // Update hits count for found entries.
             const entryIds = contextEntries.map(e => e.id);
-            // Non-blocking update, no need to await
             sql`
                 UPDATE knowledge_base
                 SET hits = hits + 1
                 WHERE id = ANY(${entryIds as any});
             `.catch(err => console.error("Failed to update hits count:", err));
-        }
 
-        const contextText = contextEntries
-            .map(e => `Q: ${e.question}\nA: ${e.answer}`)
-            .join('\n---\n');
-
-        const systemInstruction = `You are a helpful and friendly assistant for "Payvast Software Group". Your name is "Peyvastyar".
-Answer the user's question based *only* on the provided context.
-If the context is empty or does not contain the answer, state that you don't have enough information and suggest they ask in a different way or contact support.
-Always answer in Persian. Be concise and clear.`;
-
-        const prompt = `Context:\n${contextText}\n\nUser Question: ${normalizedQuestion}`;
+            res.json({ answer: combinedAnswer, sources: contextEntries });
         
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: {
-                systemInstruction: systemInstruction,
-                thinkingConfig: { thinkingBudget: 0 }
-            }
-        });
-
-        res.json({ answer: response.text, sources: contextEntries });
+        } else {
+            // DEBUG: If no context found, return a message indicating direct search failed.
+            res.json({ 
+                answer: "موردی در پایگاه دانش برای این سوال یافت نشد. (جستجوی مستقیم بدون دخالت هوش مصنوعی)",
+                sources: [] 
+            });
+        }
 
     } catch (error: any) {
-        console.error('Error with Gemini API:', error.message);
-        if (error.cause) {
-            console.error('Underlying cause:', error.cause);
-        }
-        res.status(500).json({ error: 'Failed to get a response from the AI assistant.' });
+        console.error('Error during direct database search:', error.message);
+        res.status(500).json({ error: 'Failed to search the knowledge base.' });
     }
 });
 
