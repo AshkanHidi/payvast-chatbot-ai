@@ -97,35 +97,59 @@ app.post('/api/chat', async (req, res) => {
         const normalizedQuestion = normalizePersian(question);
         const contextEntries = await findRelevantContext(normalizedQuestion);
 
-        if (contextEntries.length > 0) {
-            // DEBUG: Bypass Gemini and return direct DB results.
-            const combinedAnswer = contextEntries
-                .map(e => e.answer)
-                .join('\n\n---\n\n');
-
-            // Update hits count for found entries.
-            const entryIds = contextEntries.map(e => e.id);
-            sql`
-                UPDATE knowledge_base
-                SET hits = hits + 1
-                WHERE id = ANY(${entryIds as any});
-            `.catch(err => console.error("Failed to update hits count:", err));
-
-            res.json({ answer: combinedAnswer, sources: contextEntries });
-        
-        } else {
-            // DEBUG: If no context found, return a message indicating direct search failed.
-            res.json({ 
-                answer: "موردی در پایگاه دانش برای این سوال یافت نشد. (جستجوی مستقیم بدون دخالت هوش مصنوعی)",
-                sources: [] 
+        // If no relevant context is found in the KB, respond politely.
+        if (contextEntries.length === 0) {
+            return res.json({
+                answer: "متاسفانه پاسخی برای این سوال در پایگاه دانش ما وجود ندارد. لطفاً سوال خود را واضح‌تر بیان کنید یا با پشتیبانی تماس بگیرید.",
+                sources: []
             });
         }
 
+        // Prepare the context and prompt for the AI
+        const contextText = contextEntries.map(entry => `پاسخ: ${entry.answer}`).join('\n\n');
+        
+        const systemInstruction = `شما یک دستیار هوشمند و متخصص برای "گروه نرم‌افزاری پیوست" هستید. وظیفه شما پاسخ دادن به سوالات کاربر فقط و فقط بر اساس "اطلاعات مرجع" ارائه شده است. پاسخ‌های شما باید به زبان فارسی، روان و حرفه‌ای باشد. هرگز اطلاعاتی خارج از "اطلاعات مرجع" به پاسخ اضافه نکنید. اگر پاسخ سوال در "اطلاعات مرجع" وجود ندارد، باید بگویید: "متأسفانه، من اطلاعات کافی برای پاسخ به این سوال در پایگاه دانش خود ندارم."`;
+
+        const promptForModel = `
+## اطلاعات مرجع:
+${contextText}
+
+---
+
+## سوال کاربر:
+${normalizedQuestion}
+
+**دستورالعمل:** با توجه دقیق به "اطلاعات مرجع" بالا، یک پاسخ کامل و روان برای "سوال کاربر" بنویس.
+`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: promptForModel,
+            config: {
+                systemInstruction: systemInstruction,
+                temperature: 0.2, // Lower temperature for more factual and less creative responses
+            },
+        });
+        
+        const answer = response.text;
+
+        // Increment the hit counter for the source documents
+        const entryIds = contextEntries.map(e => e.id);
+        sql`
+            UPDATE knowledge_base
+            SET hits = hits + 1
+            WHERE id = ANY(${entryIds as any});
+        `.catch(err => console.error("Failed to update hits count:", err));
+
+        res.json({ answer, sources: contextEntries });
+
     } catch (error: any) {
-        console.error('Error during direct database search:', error.message);
-        res.status(500).json({ error: 'Failed to search the knowledge base.' });
+        console.error('Error in /api/chat endpoint:', error.message);
+        // Check for specific Gemini API errors if needed
+        res.status(500).json({ error: 'An error occurred while communicating with the AI service.' });
     }
 });
+
 
 // --- CRUD Endpoints for Knowledge Base ---
 
