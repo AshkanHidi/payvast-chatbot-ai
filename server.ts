@@ -26,7 +26,7 @@ const port = process.env.PORT || 3001;
 
 // Middlewares
 app.use(cors());
-app.use(express.json() as express.RequestHandler);
+app.use(express.json());
 
 // --- Globals ---
 let ai: GoogleGenAI;
