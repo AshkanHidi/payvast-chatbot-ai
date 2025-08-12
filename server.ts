@@ -39,25 +39,21 @@ const ai = new GoogleGenAI({ apiKey: apiKey || 'INVALID_KEY' });
 // --- Knowledge Base Logic with PostgreSQL ---
 
 /**
- * Finds the most relevant knowledge base entries using Trigram similarity.
- * It no longer uses a strict threshold, instead always returning the top candidates
- * to let the LLM make the final decision on relevance.
- * Ranks results by relevance and then by hits.
+ * Finds the most relevant knowledge base entries using the trigram distance operator (<->).
+ * This method is highly efficient with a GIN index and accurately finds the "nearest neighbors"
+ * to the user's question, effectively solving the issue of not finding exact or very similar matches.
  */
 const findRelevantContext = async (userQuestion: string, maxResults = 3): Promise<KnowledgeEntry[]> => {
     if (!userQuestion || !userQuestion.trim()) return [];
 
     try {
-        // The WHERE clause has been removed to make the search more flexible.
-        // We now always fetch the top N most similar results and let the LLM decide if they're useful.
+        // Using the <-> operator for distance is more efficient with GIN/GiST indexes
+        // for finding the "nearest neighbors" (most similar strings).
         const { rows } = await sql<KnowledgeEntry>`
             SELECT 
-                *,
-                similarity(question, ${userQuestion}) as relevance
+                *
             FROM knowledge_base
-            ORDER BY
-                relevance DESC,
-                hits DESC
+            ORDER BY question <-> ${userQuestion}
             LIMIT ${maxResults};
         `;
         return rows;
