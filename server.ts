@@ -39,21 +39,19 @@ const ai = new GoogleGenAI({ apiKey: apiKey || 'INVALID_KEY' });
 // --- Knowledge Base Logic with PostgreSQL ---
 
 /**
- * Finds the most relevant knowledge base entries using the trigram distance operator (<->).
- * This method is highly efficient with a GIN index and accurately finds the "nearest neighbors"
- * to the user's question, effectively solving the issue of not finding exact or very similar matches.
+ * Finds the most relevant knowledge base entries using the trigram similarity() function.
+ * This method is highly reliable for finding the "nearest neighbors" to the user's question,
+ * filtering for a minimum relevance threshold and ordering by the most similar.
  */
-const findRelevantContext = async (userQuestion: string, maxResults = 3): Promise<KnowledgeEntry[]> => {
+const findRelevantContext = async (userQuestion: string, maxResults = 3, similarityThreshold = 0.1): Promise<KnowledgeEntry[]> => {
     if (!userQuestion || !userQuestion.trim()) return [];
 
     try {
-        // Using the <-> operator for distance is more efficient with GIN/GiST indexes
-        // for finding the "nearest neighbors" (most similar strings).
         const { rows } = await sql<KnowledgeEntry>`
-            SELECT 
-                *
+            SELECT *
             FROM knowledge_base
-            ORDER BY question <-> ${userQuestion}
+            WHERE similarity(question, ${userQuestion}) > ${similarityThreshold}
+            ORDER BY similarity(question, ${userQuestion}) DESC
             LIMIT ${maxResults};
         `;
         return rows;
@@ -89,13 +87,13 @@ app.post('/api/chat', async (req, res) => {
             `.catch(err => console.error("Failed to update hits count:", err));
         }
 
-        const contextText = contextEntries.length > 0
-            ? contextEntries.map(e => `Q: ${e.question}\nA: ${e.answer}`).join('\n---\n')
-            : "No relevant context found.";
+        const contextText = contextEntries
+            .map(e => `Q: ${e.question}\nA: ${e.answer}`)
+            .join('\n---\n');
 
         const systemInstruction = `You are a helpful and friendly assistant for "Payvast Software Group". Your name is "Peyvastyar".
 Answer the user's question based *only* on the provided context.
-If the context does not contain the answer, state that you don't have enough information and suggest they ask in a different way or contact support.
+If the context is empty or does not contain the answer, state that you don't have enough information and suggest they ask in a different way or contact support.
 Always answer in Persian. Be concise and clear.`;
 
         const prompt = `Context:\n${contextText}\n\nUser Question: ${question}`;
