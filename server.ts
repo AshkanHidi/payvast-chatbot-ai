@@ -1,5 +1,5 @@
 
-import express, { json } from 'express';
+import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
@@ -26,7 +26,7 @@ const app = express();
 
 // Middlewares
 app.use(cors());
-app.use(json());
+app.use(express.json() as express.RequestHandler);
 
 // --- Globals & Initialization ---
 const apiKey = process.env.API_KEY;
