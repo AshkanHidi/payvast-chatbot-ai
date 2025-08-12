@@ -8,6 +8,24 @@ import { fileURLToPath } from 'url';
 // Load environment variables from .env file
 config();
 
+/**
+ * Normalizes Persian text for consistent searching and storage.
+ * - Converts Arabic 'ي' and 'ك' to their Persian equivalents.
+ * - Handles special characters like ZWNJ.
+ * - Applies NFC Unicode normalization.
+ * - Trims and collapses whitespace.
+ */
+const normalizePersian = (text: string | null | undefined): string => {
+    if (!text) return '';
+    return text
+        .normalize('NFC')
+        .replace(/ي/g, 'ی') // Arabic Yeh to Persian Yeh
+        .replace(/ك/g, 'ک') // Arabic Kaf to Persian Kaf
+        .replace(/‌/g, ' ') // Replace Zero-width non-joiner with a space
+        .replace(/\s+/g, ' ') // Collapse multiple whitespace chars into a single space
+        .trim();
+};
+
 interface KnowledgeEntrySeed {
   id: string;
   question: string;
@@ -82,10 +100,10 @@ async function seedDatabase() {
         `,
         [
           entry.id,
-          entry.question,
-          entry.answer,
+          normalizePersian(entry.question),
+          normalizePersian(entry.answer),
           entry.type,
-          entry.system,
+          normalizePersian(entry.system),
           entry.hasVideo || false,
           entry.hasDocument || false,
           entry.hasImage || false,
